@@ -1,0 +1,299 @@
+---
+title: "Patient Charges"
+author: "Alexandros Tsiolis"
+format:
+  html:
+    toc: true
+    toc-location: left
+    code-fold: true
+    code-summary: "Show the code"
+    embed-resources: true
+    fig-width: 8
+    fig-height: 4
+execute:
+  warning: false
+jupyter: python3
+---
+  
+## Introduction
+
+The goal of this project is to analyze the data of a health insurance company and to find out which factors affect the charges of the patients. The data set contains 1338 rows and 7 columns. The columns are the following:
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+from sklearn.cluster import KMeans
+from sklearn.cluster import AgglomerativeClustering
+```
+```{python}
+#read csv file with read_csv
+mydata=pd.read_csv("insurance.csv")
+mydata.head(5)
+mydata.info()
+
+```
+
+## Correlation 
+
+I calculate the correlation matrix of the data frame and I plot it with a heatmap with seaborn. The correlation matrix shows that the charges are highly correlated with the age and the bmi, while there doesn't seem to be any other strong correlation between the other columns.
+
+```{python}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+#| fig-align: center
+#show the correlation matrix of the data frame with a heatmap
+sns.heatmap(mydata.corr(),annot=True)
+plt.show()
+```
+## Analysis 
+I group the data frame by age, creating 3 groups: young, middle and old, and i add a new column to the data frame with the name age_group. I do the same with the bmi column, creating 4 groups: low, medium, high and very high, and i add a new column to the data frame with the name bmi_group. 
+```{python}
+#group bmi in 4 groups and add a new column to the data frame
+#low bmi < 18.5, medium 18.5 <= bmi < 24.9, high 25 <= bmi < 29.5, very high bmi >= 30
+mydata['bmi_group']=pd.cut(mydata['bmi'],bins=[0,18.5,25,30,100],labels=['low','medium','high','very high']) 
+mydata.head(5)
+```
+```{python}
+# group age in 3 groups and add a new column to the data frame
+# young age < 30, middle age >= 30 and age < 50, old age >= 50
+mydata['age_group']=pd.cut(mydata['age'],bins=[0,30,50,100],labels=['young','middle','old'])
+mydata.head(5)
+```
+I calculate the mean of the charges for each age group and i plot them. The plot shows that the charges are higher, the older the patient is.
+
+```{python}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+#| fig-align: center
+#calculate the mean of the charges age groups and plot them
+age_groups=mydata.groupby('age_group').mean()
+plt.bar(age_groups.index,age_groups['charges'])
+plt.title('Charges vs Age')
+plt.xlabel('age group')
+plt.ylabel('charges')
+plt.show()
+```
+
+I calculate the mean of the charges for each age group by smoker status and i plot them. The plot shows that the charges are higher for smokers than for non-smokers and the trend is the same for all age groups.
+
+```{python}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+#| fig-align: center
+# Create subplots with 1 row and 2 columns
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+# Scatter plot
+ax1.scatter(mydata['age'], mydata['charges'], c=mydata['smoker'].map({'yes': 'red', 'no': 'blue'}))
+ax1.set_xlabel('age')
+ax1.set_ylabel('charges')
+smoker_patch = ax1.scatter([], [], c='red', label='Smoker')
+non_smoker_patch = ax1.scatter([], [], c='blue', label='Non-Smoker')
+fig.legend(handles=[smoker_patch, non_smoker_patch], loc='lower center')
+ax1.set_title("Smoker vs Non-Smoker Charges by Age")
+
+# Bar plot 
+age_smoker_groups = mydata.groupby(['age_group', 'smoker']).mean()
+age_smoker_groups.unstack().plot(kind='bar', y='charges', ax=ax2, color=['blue', 'red'])
+ax2.set_xlabel('age group')
+ax2.get_legend().remove()
+ax2.set_title('Mean Charges by Age Group and Smoker Status')
+
+
+# Adjust spacing between subplots
+plt.tight_layout()
+
+# Show the figure
+plt.show()
+
+```
+I calculate the mean of the charges for each bmi and age group and i plot them. The plot shows that the charges are higher, the higher the bmi is for the younger and older patients, while for the middle age patients this trend is not so clear.
+
+```{python}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+#| fig-align: center
+# Create subplots with 1 row and 2 columns
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+# Scatter plot
+ax1.scatter(mydata['age'], mydata['charges'], c=mydata['bmi_group'].map({'low': 'red', 'medium': 'blue', 'high': 'green', 'very high': 'yellow'}))
+ax1.set_xlabel('age')
+ax1.set_ylabel('charges')
+low_bmi_patch = ax1.scatter([], [], c='red', label='Low BMI')
+medium_bmi_patch = ax1.scatter([], [], c='blue', label='Medium BMI')
+high_bmi_patch = ax1.scatter([], [], c='green', label='High BMI')
+very_high_bmi_patch = ax1.scatter([], [], c='yellow', label='Very High BMI')
+fig.legend(handles=[low_bmi_patch, medium_bmi_patch, high_bmi_patch, very_high_bmi_patch], loc='lower center')
+ax1.set_title('BMI vs Charges by Age')
+
+# Bar plot
+age_bmi_groups = mydata.groupby(['age_group', 'bmi_group']).mean()
+age_bmi_groups.unstack().plot(kind='bar', y='charges', ax=ax2,color=['red','blue','green','yellow'])
+ax2.set_xlabel('age group')
+ax2.get_legend().remove()
+ax2.set_title('Mean Charges by Age Group and BMI Group')
+
+# Adjust spacing between subplots
+plt.tight_layout()
+
+# Show the figure
+plt.show()
+```
+While plotting the charges for each bmi group and smoker status, i noticed that the charges are higher for smokers than for non-smokers and the trend is the same for all bmi groups.
+
+```{python}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+#| fig-align: center
+# Create subplots with 1 row and 2 columns
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+# Scatter plot
+ax1.scatter(mydata['bmi'], mydata['charges'], c=mydata['smoker'].map({'yes': 'red', 'no': 'blue'}))
+ax1.set_xlabel('bmi')
+ax1.set_ylabel('charges')
+smoker_patch = ax1.scatter([], [], c='red', label='Smoker')
+non_smoker_patch = ax1.scatter([], [], c='blue', label='Non-Smoker')
+fig.legend(handles=[smoker_patch, non_smoker_patch], loc='lower center')
+ax1.set_title('Smoker vs Non-Smoker Charges by BMI')
+
+# Bar plot
+bmi_smoker_groups = mydata.groupby(['bmi_group', 'smoker']).mean()
+bmi_smoker_groups.unstack().plot(kind='bar', y='charges', ax=ax2, color=['blue', 'red'])
+ax2.set_xlabel('bmi group')
+ax2.get_legend().remove()
+ax2.set_title('Mean Charges by BMI Group and Smoker Status')
+
+# Adjust spacing between subplots
+plt.tight_layout()
+
+# Show the figure
+plt.show()
+
+```
+Regarding the region, the charges are higher for the southeast region and lower for the southwest region.
+```{python}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+#| fig-align: center
+#calculate the mean of the charges for the region and plot them
+region_groups=mydata.groupby('region').mean()
+plt.bar(region_groups.index,region_groups['charges'])
+plt.xlabel('region')
+plt.ylabel('charges')
+plt.show()
+```
+The plot for the charges in regard to sex shows slightly higher charges for male patients.
+
+```{python}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+#| fig-align: center
+#calculate the mean of the charges for the gender 
+sex_groups=mydata.groupby('sex').mean()
+plt.bar(sex_groups.index,sex_groups['charges'])
+plt.xlabel('sex')
+plt.ylabel('charges')
+plt.show()
+```
+
+## Preprocessing
+
+I convert the categorical data into numerical data using one hot encoding and i drop the categorical data from the dataset.
+
+### One hot encoding
+
+```{python}
+#preprocessing the data for the model 
+#converting the categorical data into numerical data one hot encoding
+categorical_features=["sex","smoker","region","age_group","bmi_group"]
+for col in categorical_features:
+    dummies=pd.get_dummies(mydata[col],prefix=col)
+    mydata=pd.concat([mydata,dummies],axis=1)
+    
+#make a copy of the data withou the categorical data
+mydata1=mydata.copy()
+#drop the categorical data
+mydata1.drop(categorical_features,axis=1,inplace=True)
+mydata1.head()
+```
+## Clustering
+### Kmeans clustering
+I'm going to use the elbow method to find the optimal number of clusters for the kmeans algorithm. The graph shows that the optimal number of clusters is 3.
+```{python}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+#| fig-align: center
+
+#plot the elbow graph to find the optimal number of clusters
+wcss=[]
+for i in range(1,11):
+    kmeans=KMeans(n_clusters=i,init='k-means++',random_state=42)
+    kmeans.fit(mydata1)
+    wcss.append(kmeans.inertia_)
+plt.plot(range(1,11),wcss)
+plt.title('The Elbow Method')
+plt.xlabel('Number of clusters')
+plt.ylabel('WCSS')
+plt.show()
+
+```
+```{python}
+#cluster the data using kmeans
+kmeans=KMeans(n_clusters=3)
+kmeans.fit(mydata1)
+y_kmeans=kmeans.predict(mydata1)
+```
+The plot shows the clusters that the kmeans algorithm created on the charges and bmi axis.
+```{python}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+#| fig-align: center
+
+#plot the clusters 
+plt.scatter(mydata["bmi"],mydata["charges"],c=y_kmeans,cmap='rainbow')
+plt.ylabel('charges')
+plt.xlabel('bmi')
+plt.show()
+```
+### Agglomerative clustering
+I'm going to use the agglomerative clustering algorithm to cluster the data as well. Agglomerative clustering is a bottom-up approach, initially, each data point is a cluster of its own, further pairs of clusters are merged as one moves up the hierarchy. The plot shows the clusters that the algorithm created on the children and charges axis.
+```{python}
+#aggloremative clustering 
+
+agglo=AgglomerativeClustering(n_clusters=4)
+agglo.fit(mydata1)
+y_agglo=agglo.fit_predict(mydata1)
+```
+
+```{python}
+#| column: screen
+#| out-width: 100%
+#| fig-format: svg
+#| fig-align: center
+
+#plot the clusters
+plt.scatter(mydata["children"],mydata["charges"],c=y_agglo,cmap='rainbow')
+plt.ylabel('charges')
+plt.xlabel('children')
+plt.show()
+
+```
+ 
+## Conclusion
+It seems that both Kmeans and Agglomerative clustering algorithms did a good job clustering the data. The clusters are not perfect but they are good enough to be used for the model. they both seem to have clustered the data based on the amount of charges.
+  
+
+
